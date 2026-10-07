@@ -1,6 +1,34 @@
 import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 import * as fs from 'node:fs';
 
+function getOwnerAddress(owner: unknown): string | null {
+  if (!owner || typeof owner !== 'object') {
+    return null;
+  }
+
+  const candidate = owner as Record<string, unknown>;
+  if (typeof candidate.AddressOwner === 'string') {
+    return candidate.AddressOwner;
+  }
+  if (typeof candidate.ObjectOwner === 'string') {
+    return candidate.ObjectOwner;
+  }
+  return null;
+}
+
+function toBigInt(value: unknown): bigint {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return BigInt(Math.trunc(value));
+  if (typeof value === 'string' && value.trim() !== '') {
+    try {
+      return BigInt(value);
+    } catch {
+      return 0n;
+    }
+  }
+  return 0n;
+}
+
 export interface CoinBalanceInfo {
   coinType: string;
   totalBalance: string;
@@ -62,13 +90,13 @@ export async function fetchWalletBalances(
   let targetBalance = '0';
   const otherBalances: CoinBalanceInfo[] = [];
 
-  for (const b of allBalances) {
+  for (const b of allBalances ?? []) {
     if (b.coinType === targetCoinType) {
-      targetBalance = b.totalBalance;
+      targetBalance = b.totalBalance ?? '0';
     } else {
       otherBalances.push({
         coinType: b.coinType,
-        totalBalance: b.totalBalance,
+        totalBalance: b.totalBalance ?? '0',
       });
     }
   }
@@ -100,39 +128,42 @@ export async function fetchWalletHistory(
   const historyMap = new Map<string, TransactionInfo>();
 
   const processBlock = (tx: any, direction: 'OUTBOUND' | 'INBOUND') => {
-    const digest = tx.digest;
-    if (historyMap.has(digest)) return;
+    const digest = tx?.digest;
+    if (!digest || historyMap.has(digest)) return;
 
-    const timestamp = tx.timestampMs
+    const timestamp = tx?.timestampMs
       ? new Date(Number(tx.timestampMs)).toISOString()
       : null;
 
     let counterparty = 'Unknown';
     if (direction === 'OUTBOUND') {
-      // Find recipient from balance changes where balance increased
-      if (tx.balanceChanges && Array.isArray(tx.balanceChanges)) {
-        const recipientChange = tx.balanceChanges.find(
-          (c: any) => c.owner?.AddressOwner && c.owner.AddressOwner !== address && BigInt(c.amount) > 0n
-        );
+      if (tx?.balanceChanges && Array.isArray(tx.balanceChanges)) {
+        const recipientChange = tx.balanceChanges.find((c: any) => {
+          const ownerAddress = getOwnerAddress(c?.owner);
+          return ownerAddress && ownerAddress !== address && toBigInt(c?.amount) > 0n;
+        });
         if (recipientChange) {
-          counterparty = recipientChange.owner.AddressOwner;
+          counterparty = getOwnerAddress(recipientChange.owner) || 'Unknown';
         }
       }
     } else {
-      counterparty = tx.transaction?.data?.sender || 'Unknown';
+      counterparty = tx?.transaction?.data?.sender || 'Unknown';
     }
 
     let transferredAmount = '0';
     let coinType = '0x2::sui::SUI';
 
-    if (tx.balanceChanges && Array.isArray(tx.balanceChanges)) {
+    if (tx?.balanceChanges && Array.isArray(tx.balanceChanges)) {
       for (const change of tx.balanceChanges) {
+        const ownerAddress = getOwnerAddress(change?.owner);
+        const amount = toBigInt(change?.amount);
+        const isWalletBalance = ownerAddress === address;
         if (
-          (direction === 'OUTBOUND' && change.owner?.AddressOwner === address && BigInt(change.amount) < 0n) ||
-          (direction === 'INBOUND' && change.owner?.AddressOwner === address && BigInt(change.amount) > 0n)
+          (direction === 'OUTBOUND' && isWalletBalance && amount < 0n) ||
+          (direction === 'INBOUND' && isWalletBalance && amount > 0n)
         ) {
-          transferredAmount = (BigInt(change.amount) < 0n ? -BigInt(change.amount) : BigInt(change.amount)).toString();
-          coinType = change.coinType;
+          transferredAmount = (amount < 0n ? -amount : amount).toString();
+          coinType = change.coinType || coinType;
           break;
         }
       }
@@ -148,8 +179,8 @@ export async function fetchWalletHistory(
     });
   };
 
-  sentBlocks.data.forEach((tx) => processBlock(tx, 'OUTBOUND'));
-  receivedBlocks.data.forEach((tx) => processBlock(tx, 'INBOUND'));
+  (sentBlocks?.data ?? []).forEach((tx: any) => processBlock(tx, 'OUTBOUND'));
+  (receivedBlocks?.data ?? []).forEach((tx: any) => processBlock(tx, 'INBOUND'));
 
   return Array.from(historyMap.values());
 }
@@ -185,18 +216,19 @@ export async function fetchCoinHolders(
         })
       );
 
-      for (const tx of txs.data) {
+      for (const tx of txs.data ?? []) {
         if (tx.balanceChanges && Array.isArray(tx.balanceChanges)) {
           for (const change of tx.balanceChanges) {
-            if (change.coinType === coinType && change.owner?.AddressOwner) {
-              const addr = change.owner.AddressOwner;
+            const addr = getOwnerAddress(change?.owner);
+            if (change.coinType === coinType && addr) {
               if (!holderMap.has(addr)) {
                 try {
                   const bal = await retryWithBackoff(() =>
                     client.getBalance({ owner: addr, coinType })
                   );
-                  if (BigInt(bal.totalBalance) > 0n) {
-                    holderMap.set(addr, BigInt(bal.totalBalance));
+                  const balance = toBigInt(bal?.totalBalance);
+                  if (balance > 0n) {
+                    holderMap.set(addr, balance);
                   }
                 } catch {
                   // Ignore

@@ -1,0 +1,20 @@
+{
+  "name": "sui-holder-tracker",
+  "version": "1.0.0",
+  "description": "Sui Chain Holder & Wallet Tracker CLI",
+  "main": "src/tracker.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/tracker.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mysten/sui": "^1.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

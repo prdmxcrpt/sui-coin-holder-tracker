@@ -248,6 +248,13 @@ export async function fetchCoinHolders(
     holders.push({ address, balance: balance.toString() });
   });
 
+  holders.sort((a, b) => {
+    const diff = BigInt(b.balance) - BigInt(a.balance);
+    if (diff > 0n) return 1;
+    if (diff < 0n) return -1;
+    return 0;
+  });
+
   return holders;
 }
 

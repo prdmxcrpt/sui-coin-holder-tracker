@@ -1,0 +1,25 @@
+{
+  "name": "sui-coin-holder-tracker",
+  "version": "1.0.0",
+  "description": "CLI tool to track token holders and wallet histories on the Sui blockchain",
+  "main": "dist/tracker.js",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": ["sui", "blockchain", "tracker", "holder", "crypto"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "@mysten/sui": "^1.18.0"
+  }
+}

@@ -35,7 +35,7 @@ jobs:
 
       - name: Execute Sui Holder Tracker Script
         env:
-          COIN_ADDRESS: ${{ github.event.inputs.coin_type || '0x8130994ef5299d244dbf18cf1e134c3aea2ab517ee37c351a40cd9ed33bc59ca::chillbull::CHILLBULL' }}
+          COIN_ADDRESS: ${{ github.event.inputs.coin_type || '0x8130994ef5299d244dbf18cf1e134c3aea2ab517ee37c351a40cd9ed33bc59ca' }}
         run: |
           npm run dev -- --coin "$COIN_ADDRESS"
 

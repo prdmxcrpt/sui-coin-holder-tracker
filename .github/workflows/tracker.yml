@@ -1,0 +1,47 @@
+name: Sui Coin Holder Tracker
+
+on:
+  # Ermöglicht das manuelle Ausführen im GitHub Actions Tab mit eigener Coin Type Eingabe
+  workflow_dispatch:
+    inputs:
+      coin_type:
+        description: 'Sui Coin Type Address'
+        required: true
+        default: '0x8130994ef5299d244dbf18cf1e134c3aea2ab517ee37c351a40cd9ed33bc59ca::chillbull::CHILLBULL'
+
+  # Automatischer täglicher Run (z. B. jeden Tag um 0:00 UTC)
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  track-holders:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build TypeScript Project
+        run: npm run build --if-present
+
+      - name: Execute Sui Holder Tracker Script
+        env:
+          COIN_ADDRESS: ${{ github.event.inputs.coin_type || '0x8130994ef5299d244dbf18cf1e134c3aea2ab517ee37c351a40cd9ed33bc59ca::chillbull::CHILLBULL' }}
+        run: |
+          npm run dev -- --coin "$COIN_ADDRESS"
+
+      - name: Upload Report as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sui-holders-report-${{ github.run_id }}
+          path: holders_report.json
+          retention-days: 30

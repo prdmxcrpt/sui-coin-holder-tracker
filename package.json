@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/tracker.ts",
+    "fetch-coins": "tsx src/fetch-coins.ts",
     "test": "vitest run"
   },
   "dependencies": {
